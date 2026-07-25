@@ -13,10 +13,18 @@ import {
   PanelLeftClose,
   PanelLeft,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSettingsStore } from '@/stores/settings-store';
 
-const NAV_ITEMS = [
+interface NavItem {
+  to: string;
+  label: string;
+  icon: LucideIcon;
+  end?: boolean;
+}
+
+const NAV_ITEMS: NavItem[] = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/extraction', label: 'Extraction', icon: Search },
   { to: '/queue', label: 'Queue', icon: ListOrdered },
@@ -27,7 +35,7 @@ const NAV_ITEMS = [
   { to: '/logs', label: 'Logs', icon: ScrollText },
   { to: '/help', label: 'Help', icon: HelpCircle },
   { to: '/about', label: 'About', icon: Info },
-] as const;
+];
 
 export function Sidebar() {
   const collapsed = useSettingsStore((s) => s.sidebarCollapsed);
