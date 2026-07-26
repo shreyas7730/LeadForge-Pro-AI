@@ -22,8 +22,23 @@ export default defineManifest({
     '48': 'public/icons/icon-48.png',
     '128': 'public/icons/icon-128.png',
   },
-  permissions: ['storage', 'tabs', 'windows'],
-  host_permissions: [],
+  permissions: ['storage', 'tabs', 'windows', 'scripting'],
+  host_permissions: [
+    'https://www.google.com/*',
+    'https://google.com/*',
+    'http://*/*',
+    'https://*/*',
+  ],
+  content_scripts: [
+    {
+      matches: [
+        'https://www.google.com/search*',
+        'https://google.com/search*',
+      ],
+      js: ['src/content/google-search.ts'],
+      run_at: 'document_idle',
+    },
+  ],
   web_accessible_resources: [
     {
       resources: ['index.html', 'assets/*'],

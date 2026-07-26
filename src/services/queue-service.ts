@@ -67,6 +67,7 @@ export const queueService = {
           businessesFound: 0,
           emailsFound: 0,
           pagesProcessed: 0,
+          pageStart: 0,
           retryCount: 0,
           maxRetries: settings.retryCount,
           createdAt: Date.now(),

@@ -1,52 +1,38 @@
 /**
- * ExtractionService — STUB for Phase 2.
- * Real Google extraction arrives in Phase 3.
+ * ExtractionService — facade used by UI / messaging.
+ * Delegates to ExtractionEngine (Phase 3).
  */
 
-import type { ExtractionSession } from '@/types/domain';
-import { AppError } from '@/utils/errors';
-import { logger } from '@/services/logger-service';
+import type { ExtractionSession, ExtractionSettings } from '@/types/domain';
+import { extractionEngine } from '@/services/extraction-engine';
 
 export const extractionService = {
-  /**
-   * Placeholder. Phase 3 will open Google tabs and drive the parser.
-   */
-  async start(_sessionId: string): Promise<void> {
-    logger.warn('extractionService.start called before Phase 3 implementation', {
-      category: 'system',
-    });
-    throw new AppError(
-      'UNKNOWN',
-      'Extraction engine is not available until Phase 3',
-      { recoverable: false }
-    );
+  async start(input: {
+    keywords: string[];
+    locations: string[];
+    settings?: Partial<ExtractionSettings>;
+    name?: string;
+  }): Promise<{ sessionId: string }> {
+    return extractionEngine.start(input);
   },
 
-  async pause(_sessionId: string): Promise<void> {
-    throw new AppError(
-      'UNKNOWN',
-      'Extraction engine is not available until Phase 3',
-      { recoverable: false }
-    );
+  async pause(sessionId: string): Promise<void> {
+    return extractionEngine.pause(sessionId);
   },
 
-  async resume(_sessionId: string): Promise<void> {
-    throw new AppError(
-      'UNKNOWN',
-      'Extraction engine is not available until Phase 3',
-      { recoverable: false }
-    );
+  async resume(sessionId: string): Promise<void> {
+    return extractionEngine.resume(sessionId);
   },
 
-  async cancel(_sessionId: string): Promise<void> {
-    throw new AppError(
-      'UNKNOWN',
-      'Extraction engine is not available until Phase 3',
-      { recoverable: false }
-    );
+  async cancel(sessionId: string): Promise<void> {
+    return extractionEngine.cancel(sessionId);
   },
 
   async getActiveSession(): Promise<ExtractionSession | null> {
-    return null;
+    return extractionEngine.getState().session;
+  },
+
+  async recover(): Promise<{ sessionId: string } | null> {
+    return extractionEngine.recover();
   },
 };

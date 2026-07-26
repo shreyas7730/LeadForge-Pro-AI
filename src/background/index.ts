@@ -1,7 +1,6 @@
 /**
- * Background Service Worker — Phase 2
- * Window management + typed message routing.
- * Extraction orchestration arrives in Phase 3.
+ * Background Service Worker — Phase 3
+ * Window management + messaging + extraction orchestration.
  */
 
 import {
@@ -13,10 +12,12 @@ import { onMessage, createMessage } from '@/messaging';
 import { openDatabase } from '@/database';
 import { logger } from '@/services/logger-service';
 import { settingsService } from '@/services/settings-service';
+import { extractionService } from '@/services/extraction-service';
+import { extractionEngine } from '@/services/extraction-engine';
+import { crawlerService } from '@/services/crawler-service';
+import { DEFAULT_EXTRACTION_SETTINGS } from '@/types/domain';
 import { APP_VERSION } from '@/constants';
-import type { ExtractionTask } from '@/types/domain';
-
-// ─── Window lifecycle (Phase 1 preserved) ───────────────────────
+import { toAppError } from '@/utils/errors';
 
 chrome.action.onClicked.addListener(() => {
   void launchAppWindow();
@@ -42,11 +43,17 @@ chrome.runtime.onInstalled.addListener((details) => {
   });
 });
 
-// ─── Database bootstrap ─────────────────────────────────────────
-
 void openDatabase()
-  .then(() => {
+  .then(async () => {
     logger.info('Background database ready', { category: 'storage' });
+    const recovered = await extractionService.recover();
+    if (recovered) {
+      logger.info('Recovered extraction session (paused)', {
+        category: 'queue',
+        sessionId: recovered.sessionId,
+      });
+    }
+    await crawlerService.recover();
   })
   .catch((err: unknown) => {
     logger.error('Background database failed', {
@@ -55,14 +62,8 @@ void openDatabase()
     });
   });
 
-// ─── Typed message router ───────────────────────────────────────
-
 onMessage({
   WINDOW_READY: async (message) => {
-    logger.debug('WINDOW_READY received', {
-      category: 'messaging',
-      correlationId: message.correlationId,
-    });
     return createMessage(
       'WINDOW_ACK',
       { ok: true },
@@ -80,17 +81,120 @@ onMessage({
 
   GET_STATE: async (message) => {
     const theme = await settingsService.getTheme();
-    // Session/tasks populated in Phase 3; return empty infrastructure shape now
-    const tasks: ExtractionTask[] = [];
+    const engine = extractionEngine.getState();
     return createMessage(
       'STATE_SNAPSHOT',
       {
-        session: null,
-        tasks,
+        session: engine.session,
+        tasks: engine.tasks,
         theme,
       },
       { correlationId: message.correlationId }
     );
+  },
+
+  START_SESSION: async (message) => {
+    try {
+      const { keywords, locations, settings, name } = message.payload;
+      const result = await extractionService.start({
+        keywords,
+        locations,
+        settings: {
+          ...DEFAULT_EXTRACTION_SETTINGS,
+          ...settings,
+        },
+        name,
+      });
+      return createMessage(
+        'SESSION_STATUS',
+        {
+          sessionId: result.sessionId,
+          status: 'running',
+          totalBusinesses: 0,
+          totalEmails: 0,
+        },
+        { correlationId: message.correlationId }
+      );
+    } catch (err) {
+      const appErr = toAppError(err);
+      return createMessage(
+        'ERROR',
+        { code: appErr.code, message: appErr.message },
+        { correlationId: message.correlationId }
+      );
+    }
+  },
+
+  PAUSE_SESSION: async (message) => {
+    try {
+      await extractionService.pause(message.payload.sessionId);
+      return createMessage(
+        'SESSION_STATUS',
+        {
+          sessionId: message.payload.sessionId,
+          status: 'paused',
+          totalBusinesses:
+            extractionEngine.getState().session?.totalBusinesses ?? 0,
+          totalEmails: 0,
+        },
+        { correlationId: message.correlationId }
+      );
+    } catch (err) {
+      const appErr = toAppError(err);
+      return createMessage(
+        'ERROR',
+        { code: appErr.code, message: appErr.message },
+        { correlationId: message.correlationId }
+      );
+    }
+  },
+
+  RESUME_SESSION: async (message) => {
+    try {
+      await extractionService.resume(message.payload.sessionId);
+      return createMessage(
+        'SESSION_STATUS',
+        {
+          sessionId: message.payload.sessionId,
+          status: 'running',
+          totalBusinesses:
+            extractionEngine.getState().session?.totalBusinesses ?? 0,
+          totalEmails: 0,
+        },
+        { correlationId: message.correlationId }
+      );
+    } catch (err) {
+      const appErr = toAppError(err);
+      return createMessage(
+        'ERROR',
+        { code: appErr.code, message: appErr.message },
+        { correlationId: message.correlationId }
+      );
+    }
+  },
+
+  CANCEL_SESSION: async (message) => {
+    try {
+      await extractionService.cancel(message.payload.sessionId);
+      return createMessage(
+        'SESSION_STATUS',
+        {
+          sessionId: message.payload.sessionId,
+          status: 'cancelled',
+          totalBusinesses:
+            extractionEngine.getState().session?.totalBusinesses ?? 0,
+          totalEmails: 0,
+        },
+        { correlationId: message.correlationId }
+      );
+    } catch (err) {
+      const appErr = toAppError(err);
+      return createMessage(
+        'ERROR',
+        { code: appErr.code, message: appErr.message },
+        { correlationId: message.correlationId }
+      );
+    }
   },
 
   LOG_ENTRY: async (message) => {
@@ -115,20 +219,11 @@ onMessage({
     }
   },
 
-  // Phase 3 will handle START/PAUSE/RESUME/CANCEL_SESSION
-  START_SESSION: async (message) => {
-    logger.warn('START_SESSION received but extraction is Phase 3', {
-      category: 'messaging',
-      correlationId: message.correlationId,
+  CONTENT_READY: async (message) => {
+    logger.debug('Content script ready', {
+      category: 'parser',
+      context: { url: message.payload.url },
     });
-    return createMessage(
-      'ERROR',
-      {
-        code: 'UNKNOWN',
-        message: 'Extraction engine is not available until Phase 3',
-      },
-      { correlationId: message.correlationId }
-    );
   },
 });
 

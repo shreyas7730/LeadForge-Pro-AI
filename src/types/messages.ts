@@ -1,6 +1,5 @@
 /**
- * Typed messaging protocol — Phase 2.
- * All messages between App Window, Background, Content Scripts, and Workers.
+ * Typed messaging protocol — Phase 2 + Phase 3 extensions.
  */
 
 import type {
@@ -32,7 +31,11 @@ export type MessageType =
   | 'LOG_ENTRY'
   | 'PING'
   | 'PONG'
-  | 'ERROR';
+  | 'ERROR'
+  // Phase 3 — content script bridge
+  | 'PARSE_PAGE'
+  | 'PARSE_RESULT'
+  | 'CONTENT_READY';
 
 export interface MessageEnvelope<T extends MessageType = MessageType> {
   type: T;
@@ -40,6 +43,27 @@ export interface MessageEnvelope<T extends MessageType = MessageType> {
   timestamp: number;
   traceId?: string;
   payload: MessagePayloadMap[T];
+}
+
+/** Raw candidate from content-script parsers (pre-normalization). */
+export interface ParsedCandidate {
+  companyName: string;
+  cid?: string;
+  category?: string;
+  phone?: string;
+  website?: string;
+  websiteName?: string;
+  address?: string;
+  rating?: number;
+  reviewCount?: number;
+  latitude?: number;
+  longitude?: number;
+  googleUrl?: string;
+  mapsUrl?: string;
+  snippet?: string;
+  openStatus?: string;
+  hours?: string;
+  sourceBlock: 'local-card' | 'organic' | 'knowledge-panel';
 }
 
 export interface MessagePayloadMap {
@@ -54,7 +78,8 @@ export interface MessagePayloadMap {
   START_SESSION: {
     keywords: string[];
     locations: string[];
-    settings: ExtractionSettings;
+    settings?: Partial<ExtractionSettings>;
+    name?: string;
   };
   PAUSE_SESSION: { sessionId: string };
   RESUME_SESSION: { sessionId: string };
@@ -66,6 +91,10 @@ export interface MessagePayloadMap {
     progress: number;
     businessesFound: number;
     emailsFound: number;
+    pagesProcessed?: number;
+    currentQuery?: string;
+    currentPage?: number;
+    error?: string;
   };
   BUSINESS_UPSERT: { business: Business };
   SESSION_STATUS: {
@@ -73,6 +102,8 @@ export interface MessagePayloadMap {
     status: SessionStatus;
     totalBusinesses: number;
     totalEmails: number;
+    tasksCompleted?: number;
+    tasksTotal?: number;
   };
   EXPORT_REQUEST: {
     format: 'csv' | 'xlsx' | 'json';
@@ -94,6 +125,23 @@ export interface MessagePayloadMap {
     message: string;
     details?: unknown;
   };
+  PARSE_PAGE: {
+    taskId: string;
+    sessionId: string;
+    query: string;
+    keyword: string;
+    location: string;
+  };
+  PARSE_RESULT: {
+    taskId: string;
+    sessionId: string;
+    candidates: ParsedCandidate[];
+    hasNextPage: boolean;
+    nextStart: number;
+    pageStart: number;
+    error?: string;
+  };
+  CONTENT_READY: { url: string };
 }
 
 export type AnyMessage = {

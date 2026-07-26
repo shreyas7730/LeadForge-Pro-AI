@@ -10,6 +10,25 @@ export type BusinessStatus =
   | 'failed'
   | 'duplicate';
 
+export type CrawlStatus =
+  | 'pending'
+  | 'running'
+  | 'completed'
+  | 'failed'
+  | 'skipped'
+  | 'cancelled';
+
+export interface SocialLinks {
+  linkedin?: string;
+  facebook?: string;
+  instagram?: string;
+  twitter?: string;
+  youtube?: string;
+  pinterest?: string;
+  telegram?: string;
+  whatsapp?: string;
+}
+
 export type TaskStatus =
   | 'pending'
   | 'running'
@@ -39,8 +58,13 @@ export interface Business {
   companyName: string;
   category?: string;
   phone?: string;
+  phones: string[];
   emails: string[];
+  emailCount: number;
   website?: string;
+  websiteName?: string;
+  websiteTitle?: string;
+  metaDescription?: string;
   address?: string;
   city?: string;
   state?: string;
@@ -50,6 +74,16 @@ export interface Business {
   reviewCount?: number;
   latitude?: number;
   longitude?: number;
+  googleUrl?: string;
+  mapsUrl?: string;
+  snippet?: string;
+  openStatus?: string;
+  hours?: string;
+  socialLinks: SocialLinks;
+  crawlStatus: CrawlStatus;
+  crawlTime?: number;
+  lastVisited?: number;
+  crawlError?: string;
   keyword: string;
   location: string;
   sourceQuery: string;
@@ -61,6 +95,8 @@ export interface Business {
   lastUpdatedAt: number;
   source: 'google-local';
   sessionId?: string;
+  /** Last completed Google results start offset (for pagination resume). */
+  lastPageStart?: number;
   metadata?: Record<string, unknown>;
 }
 
@@ -76,6 +112,8 @@ export interface ExtractionTask {
   businessesFound: number;
   emailsFound: number;
   pagesProcessed: number;
+  /** Google `start` pagination offset for resume. */
+  pageStart: number;
   startedAt?: number;
   completedAt?: number;
   error?: string;
